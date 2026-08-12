@@ -14,7 +14,10 @@ tasks:
 
   down:
     desc: Stop and remove the container
-    cmd: podman compose down
+    cmds:
+      - podman compose down
+      - rm -rf var/cache/*
+      - rm -rf var/mail/*
 
   shell:
     desc: Open a bash shell inside the running container
@@ -54,3 +57,10 @@ tasks:
   logs:
     desc: Tail Apache error log
     cmd: podman exec gpro-pitwall tail -f /var/log/apache2/error.log
+
+  backup-db:
+    desc: Snapshot the SQLite DB to var/backups/ with a timestamp
+    cmd: |
+      mkdir -p var/backups
+      cp gpro_pilots.sqlite "var/backups/gpro_pilots_$(date +%Y%m%d_%H%M%S).sqlite"
+      ls -lh var/backups/ | tail -5
