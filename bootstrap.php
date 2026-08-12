@@ -92,6 +92,7 @@ $container['repo.pilot'] = new PilotRepository($container['db']);
 $container['repo.metadata'] = new DivisionMetadataRepository($container['db']);
 $container['repo.track'] = new TrackRepository($container['db']);
 $container['repo.audit'] = new \App\Repository\AuditLogRepository($container['db']);
+$container['repo.race_observation'] = new \App\Repository\RaceObservationRepository($container['db']);
 
 use App\Service\PilotCalculatorService;
 use App\Service\IdealPilotService;
@@ -224,6 +225,12 @@ $container['service.gpro_sync'] = new GproSyncService(
     $container['service.user_repo'],
     $container['service.cache'],
     Env::int('SYNC_SAFETY_MARGIN', 20),
+);
+$container['service.race_import'] = new \App\Service\RaceImportService(
+    $container['service.api_client'],
+    $container['repo.race_observation'],
+    $container['db'],
+    $container['service.cache'],
 );
 $container['service.auth_service']  = new \App\Service\AuthService(
     $container['service.user_repo'],
@@ -448,5 +455,13 @@ $container['controller.admin_users'] = new \App\Controller\AdminUserController(
     $container['service.authorize'],
     $container['twig'],
 );
+
+// Auto-import the most recently completed race on every authenticated page load.
+// The getLatestRaceAnalysis() response is cached for 1 hour, so per-request cost
+// is a single cache read on all but the first call after a race completes.
+if ($currentUser !== null && !empty($currentUser['api_token'])) {
+    $container['service.api_client']->setToken($currentUser['api_token']);
+    $container['service.race_import']->checkAndImportLatest();
+}
 
 return $container;

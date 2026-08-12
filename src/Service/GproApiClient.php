@@ -293,6 +293,39 @@ final class GproApiClient
         return $this->getCached('all_tracks_preview', '/gb/backend/api/v2/Tracks', 21600, $forceRefresh, shared: true);
     }
 
+    /**
+     * Per-manager race analysis for a completed race.
+     * Uses a long TTL — results are immutable once GPRO posts them.
+     * Does not burn the normal 99-call daily budget (separate pool).
+     *
+     * @return array<string, mixed>
+     */
+    public function getRaceAnalysis(int $season, int $race, bool $forceRefresh = false): array
+    {
+        return $this->getCached(
+            "race_analysis_{$season}_{$race}",
+            "/gb/backend/api/v2/RaceAnalysis?SR={$season},{$race}",
+            604800, // 7 days
+            $forceRefresh,
+        );
+    }
+
+    /**
+     * Most recently completed race analysis (no SR param — GPRO resolves it).
+     * Cached for 1 hour so completed races are detected within one page load cycle.
+     *
+     * @return array<string, mixed>
+     */
+    public function getLatestRaceAnalysis(bool $forceRefresh = false): array
+    {
+        return $this->getCached(
+            'race_analysis_latest',
+            '/gb/backend/api/v2/RaceAnalysis',
+            3600,
+            $forceRefresh,
+        );
+    }
+
     /** @return array<string, mixed> */
     public function getSponsorNegotiations(bool $forceRefresh = false): array
     {

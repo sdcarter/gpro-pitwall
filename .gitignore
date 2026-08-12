@@ -7,6 +7,9 @@ gpro_pilots.sqlite
 *.sqlite
 /bin/act
 /var/
+# Machine-specific corporate CA cert for Docker builds behind SSL-inspecting proxies
+/corp-ca.crt
+/docker-certs/corp-ca.crt
 
 # Claude-meta and project info — never committed
 /CLAUDE.md
@@ -16,11 +19,13 @@ gpro_pilots.sqlite
 /db_browser.php
 /bin/db_browser.php
 /bin/deploy.sh
+.claude/
 # bin/build_release.sh is tracked again (2026-07-04): the CI bundle job runs
 # it. Deploy tooling stays local-only (see lines above).
 
 # Local-only planning docs — deliberately unnamed here; see CLAUDE.md
 /.local/
+WORKFLOW.md
 
 # Offline reference spreadsheets — contain the same secret-sauce formulas
 # as config/secrets.php. Working copies only, never in git.
@@ -34,4 +39,4 @@ gpro_pilots.sqlite
 # The compiled CSS in public/assets/ IS committed.
 /bin/.tailwindcss
 
-.claude/
+

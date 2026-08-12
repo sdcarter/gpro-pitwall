@@ -1,0 +1,56 @@
+version: '3'
+
+vars:
+  APP: podman exec gpro-pitwall
+
+tasks:
+  build:
+    desc: Build the container image
+    cmd: podman compose build
+
+  up:
+    desc: Start the container (detached)
+    cmd: podman compose up -d
+
+  down:
+    desc: Stop and remove the container
+    cmd: podman compose down
+
+  shell:
+    desc: Open a bash shell inside the running container
+    cmd: podman exec -it gpro-pitwall bash
+
+  install:
+    desc: Run composer install inside the container
+    cmd: "{{.APP}} composer install --no-interaction"
+
+  setup:
+    desc: "First-time only: copy env and secrets templates, create data dir"
+    cmds:
+      - cp -n .env.example .env || true
+      - cp -n config/secrets.php.example config/secrets.php || true
+      - mkdir -p data
+
+  seed-tracks:
+    desc: Seed the tracks table from data/tracks.csv
+    cmd: "{{.APP}} php bin/seed_tracks.php"
+
+  import-race:
+    desc: "Import a race via the GPRO API. Usage: task import-race -- --season=111 --race=7"
+    cmd: "{{.APP}} php bin/import_race_analysis.php {{.CLI_ARGS}}"
+
+  fit-fuel:
+    desc: Compute candidate fuel coefficients from race observations
+    cmd: "{{.APP}} php bin/fit_fuel_coefficients.php"
+
+  test:
+    desc: Run the PHPUnit test suite
+    cmd: "{{.APP}} vendor/bin/phpunit"
+
+  analyse:
+    desc: Run PHPStan static analysis
+    cmd: "{{.APP}} vendor/bin/phpstan analyse"
+
+  logs:
+    desc: Tail Apache error log
+    cmd: podman exec gpro-pitwall tail -f /var/log/apache2/error.log

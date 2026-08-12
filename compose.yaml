@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    container_name: gpro-pitwall
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/var/www/html
+      - vendor:/var/www/html/vendor
+      - /Users/steve.carter/Documents/GitHub/personal/posh-pro/data:/posh-pro/data:ro
+      - /Users/steve.carter/Documents/GitHub/personal/posh-pro/races:/posh-pro/races:ro
+    env_file: .env
+    restart: unless-stopped
+
+volumes:
+  vendor:

@@ -16,7 +16,7 @@ class DatabaseSeeder
      * calls migrate() on every request; this version lets a warm database skip
      * the entire DDL + scan + legacy-encryption pass.
      */
-    private const int SCHEMA_VERSION = 7;
+    private const int SCHEMA_VERSION = 8;
 
     /**
      * @param array<string, string> $statsSchema
@@ -58,6 +58,7 @@ class DatabaseSeeder
         $this->createCarPartCoefficientsTable();
         $this->createGameConstantsTable();
         $this->dropDeprecatedTables();
+        $this->createRaceObservationsTable();
 
 
         $this->seedTrainings();
@@ -74,6 +75,39 @@ class DatabaseSeeder
         // Stamp the schema version last: if any step above throws, the version
         // stays behind and the next boot retries the full migrate.
         $this->db->exec('PRAGMA user_version = ' . self::SCHEMA_VERSION);
+    }
+
+    private function createRaceObservationsTable(): void
+    {
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS race_observations (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                track_name        TEXT    NOT NULL,
+                track_id          INTEGER,
+                season            INTEGER NOT NULL,
+                race_number       INTEGER NOT NULL,
+                weather           TEXT    CHECK(weather IN ('dry','wet','mixed')),
+                avg_temp          REAL,
+                laps              INTEGER,
+                concentration     INTEGER,
+                aggressiveness    INTEGER,
+                experience        INTEGER,
+                technical_insight INTEGER,
+                weight            REAL,
+                eng_lvl           REAL,
+                ele_lvl           REAL,
+                susp_lvl          REAL,
+                fuel_per_km       REAL,
+                tyre_compound     TEXT,
+                tyre_supplier     TEXT,
+                tyre_wear_pct     REAL,
+                pit_count         INTEGER,
+                source            TEXT NOT NULL DEFAULT 'api',
+                calibrated        INTEGER NOT NULL DEFAULT 0,
+                imported_at       TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(track_name, season, race_number, source)
+            )
+        ");
     }
 
     /**
