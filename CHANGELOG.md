@@ -6,6 +6,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Every release is published as an annotated git tag of the same name.
 
+## [1.13.8] - 2026-08-17
+
+### Fixed
+- Race strategy could recommend a fuel load the car cannot physically hold. The 180 L tank check was applied to the bare per-stint minimum, while the figure the manager actually fuels — recommended load, including the boost surcharge and the one-lap safety margin — was added afterwards and never re-checked. A wet Bremgarten asked for 183 L at 3 boost stints, and 179 L with no boost at all. Feasibility is now tested against the recommended load, so boost fuel or the safety lap can force an extra stop on their own.
+- The stop count was taken from tyre wear alone and never priced against the alternatives, so the planner behaved as though fewer stops were always better. Pit losses rise with each stop while fuel-weight loss falls as `1/(stops+1)`, so the total has an interior minimum the old code could overshoot: the same wet Bremgarten lost 133.32s over a no-stop race when a single stop cost 109.02s. Every stop count the tyres allow is now costed (pits + fuel weight + compound difference) and the cheapest feasible plan wins. Dry compounds share the code path and are fixed with it.
+
+## [1.13.7] - 2026-08-17
+
+### Fixed
+- Tyre supplier durability fallback had drifted from the live game on 4 of 9 suppliers (Pipirelli, Yokomama, Contimental, Michelini), refreshed from the `TyreSuppliers` feed. This map is only read when the feed is unavailable — the feed remains the source of truth for every supplier characteristic — but durability drives the tyre wear exponent, so a stale value skewed strategy whenever the fallback was in play.
+- Game constants were seeded with `INSERT OR IGNORE`, so a database that had already been seeded could never pick up a corrected value — GPRO re-tunes these between seasons. Seeding now upserts, and the schema version bump makes warm databases re-run it. Same class of bug as the training reprice in 1.13.6, in a second place.
+
+## [1.13.6] - 2026-08-17
+
+### Fixed
+- Training costs were stale. GPRO repriced the Fitness class to $750,000 and the planner still charged $700,000, understating every plan that included it. All seven costs are now verified against the official wiki.
+- Seeding a training row used `INSERT OR IGNORE`, so a price change could never reach a database that already held the old row — every existing install would have kept the wrong figure indefinitely. Seeding now upserts the cost while leaving the attribute gains untouched, and the schema version bump makes warm databases re-run it.
+- **Security:** updated `squizlabs/php_codesniffer` 4.0.1 → 4.0.4 (CVE-2026-67434, OS command injection, high). Dev-only tooling excluded from the release bundle by `composer install --no-dev`, so no shipped code was affected.
+
+### Added
+- Spa resort, the seventh training session ($500,000), which the planner never modelled. It carries the same +16.7 motivation as the sports psychologist; its energy restore is not a modelled attribute, so the planner flags it instead of projecting it — otherwise Spa reads as strictly worse than the $100k-cheaper psychologist.
+
 ## [1.13.5] - 2026-08-06
 
 ### Added
