@@ -93,6 +93,8 @@ $container['repo.metadata'] = new DivisionMetadataRepository($container['db']);
 $container['repo.track'] = new TrackRepository($container['db']);
 $container['repo.audit'] = new \App\Repository\AuditLogRepository($container['db']);
 $container['repo.race_observation'] = new \App\Repository\RaceObservationRepository($container['db']);
+$container['repo.race_setup'] = new \App\Repository\RaceSetupRepository($container['db']);
+$container['repo.race_detail'] = new \App\Repository\RaceDetailRepository($container['db']);
 
 use App\Service\PilotCalculatorService;
 use App\Service\IdealPilotService;
@@ -229,6 +231,8 @@ $container['service.gpro_sync'] = new GproSyncService(
 $container['service.race_import'] = new \App\Service\RaceImportService(
     $container['service.api_client'],
     $container['repo.race_observation'],
+    $container['repo.race_setup'],
+    $container['repo.race_detail'],
     $container['db'],
     $container['service.cache'],
 );
@@ -354,6 +358,12 @@ $container['controller.car_wear'] = new CarWearController(
     $container['twig'],
 );
 
+$container['controller.race_history'] = new \App\Controller\RaceHistoryController(
+    $container['repo.race_observation'],
+    $container['repo.race_setup'],
+    $container['repo.race_detail'],
+);
+
 $container['controller.page'] = new PageController(
     $container['service.ideal_pilot'],
     $container['service.insight'],
@@ -373,6 +383,7 @@ $container['controller.page'] = new PageController(
     $container['controller.strategy'],
     $container['controller.car_wear'],
     $container['controller.testing'],
+    $container['controller.race_history'],
     $container['service.data_mapper'],
     $container['service.recruitment'],
     $container['twig'],

@@ -38,8 +38,8 @@ if ($n < MIN_OBS) {
     echo "\n⚠️  Need at least " . MIN_OBS . " dry observations to fit fuel_factors.\n";
     echo "   Current: {$n}\n\n";
     echo "How to build up observations:\n";
-    echo "  After each race: task import-race -- --season=<S> --race=<R>\n";
-    echo "  For history:     task import-bbcode\n\n";
+    echo "  Automatic: open an authenticated page after results post.\n";
+    echo "  Manual/re-import: task import-race -- --season=<S> --race=<R>\n\n";
     echo "What each additional observation gives you:\n";
     foreach ($rows as $r) {
         printf("  S%d R%d  %-22s  fuel=%.4f  con=%s agg=%s exp=%s te=%s eng=%.1f ele=%.1f\n",

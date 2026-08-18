@@ -1,0 +1,433 @@
+{% if history_view == 'detail' %}
+
+    {% set r = history_race %}
+    <div class="card mb-4">
+        <div class="card-hd flex flex-wrap items-center justify-between gap-2">
+            <div>
+                <h3 class="t-heading">{{ r.track_name }} — Season {{ r.season }}, Race {{ r.race_number }}</h3>
+                <p class="t-caption">
+                    {{ r.weather|capitalize }}{% if r.avg_temp %} · {{ r.avg_temp }}°C{% endif %}
+                    · {{ r.laps }} laps · {{ r.pit_count }} pit stop{{ r.pit_count == 1 ? '' : 's' }}
+                </p>
+            </div>
+            <a href="?main_tab=Race History" class="text-sm font-semibold text-blue-600 hover:text-blue-800">&larr; Back to Race History</a>
+        </div>
+        <div class="p-5 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+            <div>
+                <p class="t-caption">Fuel/km</p>
+                <p class="font-mono text-lg font-bold text-slate-800">{{ r.fuel_per_km ?? '—' }}</p>
+            </div>
+            <div>
+                <p class="t-caption">Tyres</p>
+                <p class="font-mono text-lg font-bold text-slate-800">{{ r.tyre_compound ?? '—' }}</p>
+            </div>
+            <div>
+                <p class="t-caption">Supplier</p>
+                <p class="font-mono text-lg font-bold text-slate-800">{{ r.tyre_supplier ?? '—' }}</p>
+            </div>
+            <div>
+                <p class="t-caption">Earnings</p>
+                <p class="font-mono text-lg font-bold text-slate-800">{{ r.earnings_total ? r.earnings_total|number_format(0) : '—' }}</p>
+            </div>
+        </div>
+    </div>
+
+    {# ===== QUALIFYING, RISK PROFILE, ENERGY, OVERTAKING ===== #}
+    <div class="card mb-4">
+        <div class="card-hd"><h3 class="t-heading">Qualifying &amp; Race Profile</h3></div>
+        <div class="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div>
+                <p class="t-label mb-2">Qualifying</p>
+                <dl class="space-y-1 text-sm">
+                    <div class="flex justify-between"><dt class="text-slate-500">Q1</dt><dd class="font-mono">{{ r.q1_time ?? '—' }} (P{{ r.q1_pos ?? '—' }})</dd></div>
+                    <div class="flex justify-between"><dt class="text-slate-500">Q2</dt><dd class="font-mono">{{ r.q2_time ?? '—' }} (P{{ r.q2_pos ?? '—' }})</dd></div>
+                </dl>
+            </div>
+            <div>
+                <p class="t-label mb-2">Risk Profile</p>
+                <dl class="space-y-1 text-sm">
+                    <div class="flex justify-between"><dt class="text-slate-500">Q1</dt><dd>{{ r.q1_risk ?? '—' }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-slate-500">Q2</dt><dd>{{ r.q2_risk ?? '—' }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-slate-500">Start</dt><dd>{{ r.start_risk ?? '—' }}</dd></div>
+                </dl>
+            </div>
+            <div>
+                <p class="t-label mb-2">Driver Energy</p>
+                <dl class="space-y-1 text-sm">
+                    <div class="flex justify-between"><dt class="text-slate-500">Q1</dt><dd class="font-mono">{{ r.q1_energy_from ?? '—' }}% &rarr; {{ r.q1_energy_to ?? '—' }}%</dd></div>
+                    <div class="flex justify-between"><dt class="text-slate-500">Q2</dt><dd class="font-mono">{{ r.q2_energy_from ?? '—' }}% &rarr; {{ r.q2_energy_to ?? '—' }}%</dd></div>
+                    <div class="flex justify-between"><dt class="text-slate-500">Race</dt><dd class="font-mono">{{ r.race_energy_from ?? '—' }}% &rarr; {{ r.race_energy_to ?? '—' }}%</dd></div>
+                </dl>
+            </div>
+            <div>
+                <p class="t-label mb-2">Overtaking</p>
+                <dl class="space-y-1 text-sm">
+                    <div class="flex justify-between"><dt class="text-slate-500">Initiated</dt><dd class="font-mono">{{ r.overtakes ?? '—' }} / {{ r.ot_attempts ?? '—' }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-slate-500">Against you</dt><dd class="font-mono">{{ r.overtakes_on_you ?? '—' }} / {{ r.ot_attempts_on_you ?? '—' }}</dd></div>
+                </dl>
+                <p class="t-label mt-4 mb-2">Car Stats</p>
+                <dl class="space-y-1 text-sm">
+                    <div class="flex justify-between"><dt class="text-slate-500">Power / Handling / Accel</dt><dd class="font-mono">{{ r.car_power ?? '—' }} / {{ r.car_handl ?? '—' }} / {{ r.car_accel ?? '—' }}</dd></div>
+                </dl>
+            </div>
+        </div>
+        {% if r.technical_problems %}
+            <div class="px-5 pb-5">
+                <p class="t-label mb-2">Technical Problems</p>
+                {% for problem in r.technical_problems %}
+                    <p class="text-sm text-red-600">{{ problem.text ?? problem|join(' ') }}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+
+    {# ===== SETUPS USED ===== #}
+    {% if history_setups %}
+        <div class="card mb-4">
+            <div class="card-hd"><h3 class="t-heading">Setups Used</h3></div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-board">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-white">Session</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Front Wing</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Rear Wing</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Engine</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Brakes</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Gearbox</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Suspension</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Tyres</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-surface divide-y divide-slate-200">
+                        {% for s in history_setups %}
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-4 py-2 text-sm font-bold text-slate-900">{{ s.session }}</td>
+                                <td class="px-4 py-2 text-center text-sm tabular-nums">{{ s.set_fwing ?? '—' }}</td>
+                                <td class="px-4 py-2 text-center text-sm tabular-nums">{{ s.set_rwing ?? '—' }}</td>
+                                <td class="px-4 py-2 text-center text-sm tabular-nums">{{ s.set_eng ?? '—' }}</td>
+                                <td class="px-4 py-2 text-center text-sm tabular-nums">{{ s.set_bra ?? '—' }}</td>
+                                <td class="px-4 py-2 text-center text-sm tabular-nums">{{ s.set_gear ?? '—' }}</td>
+                                <td class="px-4 py-2 text-center text-sm tabular-nums">{{ s.set_susp ?? '—' }}</td>
+                                <td class="px-4 py-2 text-center text-sm">{{ s.set_tyres ?? '—' }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+    {# ===== PRACTICE LAPS ===== #}
+    {% if history_practice_laps %}
+        <div class="card mb-4">
+            <div class="card-hd"><h3 class="t-heading">Practice Laps</h3></div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead class="bg-board">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-xs font-bold uppercase tracking-wide text-white">Lap</th>
+                            <th class="px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">Time</th>
+                            <th class="px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">Net</th>
+                            <th class="px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">Mistake</th>
+                            <th class="px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">F.Wing</th>
+                            <th class="px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">R.Wing</th>
+                            <th class="px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">Engine</th>
+                            <th class="px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">Brakes</th>
+                            <th class="px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">Gear</th>
+                            <th class="px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">Susp</th>
+                            <th class="px-3 py-2 text-left text-xs font-bold uppercase tracking-wide text-white">Feedback</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-surface divide-y divide-slate-100">
+                        {% for p in history_practice_laps %}
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-3 py-1.5 font-bold text-slate-900 tabular-nums">{{ p.lap_idx }}</td>
+                                <td class="px-3 py-1.5 text-center tabular-nums">{{ p.lap_time ?? '—' }}</td>
+                                <td class="px-3 py-1.5 text-center tabular-nums">{{ p.net_time ?? '—' }}</td>
+                                <td class="px-3 py-1.5 text-center tabular-nums">{{ p.mistake_time ?? '—' }}</td>
+                                <td class="px-3 py-1.5 text-center tabular-nums">{{ p.set_fwing ?? '—' }}</td>
+                                <td class="px-3 py-1.5 text-center tabular-nums">{{ p.set_rwing ?? '—' }}</td>
+                                <td class="px-3 py-1.5 text-center tabular-nums">{{ p.set_engine ?? '—' }}</td>
+                                <td class="px-3 py-1.5 text-center tabular-nums">{{ p.set_brakes ?? '—' }}</td>
+                                <td class="px-3 py-1.5 text-center tabular-nums">{{ p.set_gear ?? '—' }}</td>
+                                <td class="px-3 py-1.5 text-center tabular-nums">{{ p.set_susp ?? '—' }}</td>
+                                <td class="px-3 py-1.5 text-slate-600">
+                                    {% if p.driver_comments %}
+                                        {% for c in p.driver_comments %}
+                                            <span class="block">{{ c.part }}: {{ c.text }}</span>
+                                        {% endfor %}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+    {# ===== CAR PARTS ===== #}
+    {% if history_car_parts %}
+        <div class="card mb-4">
+            <div class="card-hd"><h3 class="t-heading">Car Wear</h3></div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-board">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-white">Part</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Level</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Start Wear</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Finish Wear</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-surface divide-y divide-slate-200">
+                        {% for p in history_car_parts %}
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-4 py-2 text-sm font-bold text-slate-900 capitalize">{{ p.part }}</td>
+                                <td class="px-4 py-2 text-center text-sm tabular-nums">{{ p.lvl ?? '—' }}</td>
+                                <td class="px-4 py-2 text-center text-sm tabular-nums">{{ p.start_wear ?? '—' }}%</td>
+                                <td class="px-4 py-2 text-center text-sm tabular-nums">{{ p.finish_wear ?? '—' }}%</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+    {# ===== PIT STOPS ===== #}
+    {% if history_pits %}
+        <div class="card mb-4">
+            <div class="card-hd"><h3 class="t-heading">Pit Stops</h3></div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-board">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-white">Lap</th>
+                            <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-white">Reason</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Tyre Cond.</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Fuel Left</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Refilled To</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Pit Time</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-surface divide-y divide-slate-200">
+                        {% for p in history_pits %}
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-4 py-2 text-sm font-bold text-slate-900 tabular-nums">{{ p.lap }}</td>
+                                <td class="px-4 py-2 text-sm text-slate-600">{{ p.reason ?? '—' }}</td>
+                                <td class="px-4 py-2 text-center text-sm tabular-nums">{{ p.tyre_cond ?? '—' }}%</td>
+                                <td class="px-4 py-2 text-center text-sm tabular-nums">{{ p.fuel_left ?? '—' }} L</td>
+                                <td class="px-4 py-2 text-center text-sm tabular-nums">{{ p.refilled_to ?? '—' }} L</td>
+                                <td class="px-4 py-2 text-center text-sm tabular-nums">{{ p.pit_time ?? '—' }}s</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+    {# ===== FINANCIALS ===== #}
+    {% if history_transactions %}
+        <div class="card mb-4">
+            <div class="card-hd flex items-center justify-between gap-2">
+                <h3 class="t-heading">Financials</h3>
+                <span class="font-mono text-sm font-bold text-slate-800">Total: {{ r.earnings_total ? r.earnings_total|number_format(0) : '—' }}</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200">
+                    <tbody class="bg-surface divide-y divide-slate-200">
+                        {% for t in history_transactions %}
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-4 py-2 text-sm text-slate-700">{{ t.description }}</td>
+                                <td class="px-4 py-2 text-right text-sm font-mono tabular-nums {{ t.amount < 0 ? 'text-red-600' : 'text-emerald-700' }}">{{ t.amount|number_format(0) }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+    {# ===== LAP-BY-LAP TIMELINE ===== #}
+    {% if history_laps %}
+        <div class="card mb-4">
+            <div class="card-hd"><h3 class="t-heading">Lap-by-Lap</h3></div>
+            <div class="overflow-x-auto max-h-[32rem] overflow-y-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead class="bg-board sticky top-0">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-xs font-bold uppercase tracking-wide text-white">Lap</th>
+                            <th class="px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">Pos</th>
+                            <th class="px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">Tyre</th>
+                            <th class="px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">Tyre Cond.</th>
+                            <th class="px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">Fuel</th>
+                            <th class="px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">Weather</th>
+                            <th class="px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">Temp</th>
+                            <th class="px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">Event</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-surface divide-y divide-slate-100">
+                        {% for l in history_laps %}
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-3 py-1.5 font-bold text-slate-900 tabular-nums">{{ l.lap_idx + 1 }}</td>
+                                <td class="px-3 py-1.5 text-center tabular-nums">{{ l.position ?? '—' }}</td>
+                                <td class="px-3 py-1.5 text-center">{{ l.tyre_compound ?? '—' }}</td>
+                                <td class="px-3 py-1.5 text-center tabular-nums">{{ l.tyre_cond ?? '—' }}%</td>
+                                <td class="px-3 py-1.5 text-center tabular-nums">{{ l.fuel_load ?? '—' }} L</td>
+                                <td class="px-3 py-1.5 text-center text-slate-500">{{ l.weather ?? '—' }}</td>
+                                <td class="px-3 py-1.5 text-center tabular-nums">{{ l.temp ?? '—' }}°C</td>
+                                <td class="px-3 py-1.5 text-center">
+                                    {% for e in l.events %}
+                                        <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-800">{{ e.event }}</span>
+                                    {% endfor %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+{% else %}
+
+    {# ===== FILTERS ===== #}
+    <div class="card mb-4">
+        <form method="get" class="p-5 flex flex-wrap items-end gap-3">
+            <input type="hidden" name="main_tab" value="Race History">
+
+            <div>
+                <label class="t-label block mb-1">Season</label>
+                <select name="hist_season" class="form-select" onchange="this.form.submit()">
+                    <option value="">All</option>
+                    {% for s in history_options.seasons %}
+                        <option value="{{ s }}" {{ history_filters.season is defined and history_filters.season == s ? 'selected' }}>{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="t-label block mb-1">Track</label>
+                <select name="hist_track" class="form-select" onchange="this.form.submit()">
+                    <option value="">All</option>
+                    {% for tr in history_options.tracks %}
+                        <option value="{{ tr }}" {{ history_filters.track_name == tr ? 'selected' }}>{{ tr }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="t-label block mb-1">Weather</label>
+                <select name="hist_weather" class="form-select" onchange="this.form.submit()">
+                    <option value="">All</option>
+                    {% for w in ['dry', 'wet', 'mixed'] %}
+                        <option value="{{ w }}" {{ history_filters.weather == w ? 'selected' }}>{{ w|capitalize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="t-label block mb-1">Tyre Supplier</label>
+                <select name="hist_supplier" class="form-select" onchange="this.form.submit()">
+                    <option value="">All</option>
+                    {% for sup in history_options.tyre_suppliers %}
+                        <option value="{{ sup }}" {{ history_filters.tyre_supplier == sup ? 'selected' }}>{{ sup }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="t-label block mb-1">Overtaking</label>
+                <select name="hist_overtaking" class="form-select" onchange="this.form.submit()">
+                    <option value="">All</option>
+                    {% for v in history_options.overtaking %}
+                        <option value="{{ v }}" {{ history_filters.overtaking == v ? 'selected' }}>{{ v }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="t-label block mb-1">Grip</label>
+                <select name="hist_grip" class="form-select" onchange="this.form.submit()">
+                    <option value="">All</option>
+                    {% for v in history_options.grip %}
+                        <option value="{{ v }}" {{ history_filters.grip == v ? 'selected' }}>{{ v }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="t-label block mb-1">Tyre Wear</label>
+                <select name="hist_tyre_wear" class="form-select" onchange="this.form.submit()">
+                    <option value="">All</option>
+                    {% for v in history_options.tyre_wear %}
+                        <option value="{{ v }}" {{ history_filters.tyre_wear == v ? 'selected' }}>{{ v }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="t-label block mb-1">Fuel Consumption</label>
+                <select name="hist_fuel_consumption" class="form-select" onchange="this.form.submit()">
+                    <option value="">All</option>
+                    {% for v in history_options.fuel_consumption %}
+                        <option value="{{ v }}" {{ history_filters.fuel_consumption == v ? 'selected' }}>{{ v }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {% if history_filters %}
+                <a href="?main_tab=Race History" class="text-sm font-semibold text-slate-500 hover:text-slate-700">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+
+    {# ===== RACE LIST ===== #}
+    <div class="card">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200">
+                <thead class="bg-board">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-white">Season</th>
+                        <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-white">Race</th>
+                        <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-white">Track</th>
+                        <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Weather</th>
+                        <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Fuel/km</th>
+                        <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Tyres</th>
+                        <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Pits</th>
+                        <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-white">Earnings</th>
+                        <th class="px-4 py-3"></th>
+                    </tr>
+                </thead>
+                <tbody class="bg-surface divide-y divide-slate-200">
+                    {% for race in history_races %}
+                        <tr class="hover:bg-slate-50">
+                            <td class="px-4 py-3 text-sm font-bold text-slate-900 tabular-nums">{{ race.season }}</td>
+                            <td class="px-4 py-3 text-sm tabular-nums">{{ race.race_number }}</td>
+                            <td class="px-4 py-3 text-sm">{{ race.track_name }}</td>
+                            <td class="px-4 py-3 text-center text-sm capitalize">{{ race.weather ?? '—' }}</td>
+                            <td class="px-4 py-3 text-center text-sm tabular-nums">{{ race.fuel_per_km ?? '—' }}</td>
+                            <td class="px-4 py-3 text-center text-sm">{{ race.tyre_compound ?? '—' }}</td>
+                            <td class="px-4 py-3 text-center text-sm tabular-nums">{{ race.pit_count ?? '—' }}</td>
+                            <td class="px-4 py-3 text-center text-sm tabular-nums">{{ race.earnings_total ? race.earnings_total|number_format(0) : '—' }}</td>
+                            <td class="px-4 py-3 text-right">
+                                <a href="?main_tab=Race History&hist_race_season={{ race.season }}&hist_race_number={{ race.race_number }}"
+                                   class="text-sm font-semibold text-blue-600 hover:text-blue-800">View &rarr;</a>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="9" class="px-4 py-6 text-center text-sm text-slate-500">No races captured yet.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+{% endif %}

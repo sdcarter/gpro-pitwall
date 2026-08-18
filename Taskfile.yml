@@ -39,12 +39,16 @@ tasks:
     cmd: "{{.APP}} php bin/seed_tracks.php"
 
   import-race:
-    desc: "Import a race via the GPRO API. Usage: task import-race -- --season=111 --race=7"
+    desc: "Import or re-import one RaceAnalysis record with the same mapping as auto-import. Usage: task import-race -- --season=112 --race=1"
     cmd: "{{.APP}} php bin/import_race_analysis.php {{.CLI_ARGS}}"
 
   fit-fuel:
-    desc: Compute candidate fuel coefficients from race observations
+    desc: Report dry-race calibration status and fit candidate fuel coefficients when ready
     cmd: "{{.APP}} php bin/fit_fuel_coefficients.php"
+
+  audit-race-data:
+    desc: Report missing normalized RaceAnalysis sections and implausible fuel values without changing data
+    cmd: "{{.APP}} php bin/audit_race_data.php"
 
   test:
     desc: Run the PHPUnit test suite
@@ -59,7 +63,7 @@ tasks:
     cmd: podman exec gpro-pitwall tail -f /var/log/apache2/error.log
 
   backup-db:
-    desc: Snapshot the SQLite DB to var/backups/ with a timestamp
+    desc: Snapshot the personal race-history SQLite DB to var/backups/ with a timestamp
     cmd: |
       mkdir -p var/backups
       cp gpro_pilots.sqlite "var/backups/gpro_pilots_$(date +%Y%m%d_%H%M%S).sqlite"

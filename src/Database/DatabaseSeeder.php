@@ -16,7 +16,7 @@ class DatabaseSeeder
      * calls migrate() on every request; this version lets a warm database skip
      * the entire DDL + scan + legacy-encryption pass.
      */
-    private const int SCHEMA_VERSION = 8;
+    private const int SCHEMA_VERSION = 12;
 
     /**
      * @param array<string, string> $statsSchema
@@ -59,6 +59,10 @@ class DatabaseSeeder
         $this->createGameConstantsTable();
         $this->dropDeprecatedTables();
         $this->createRaceObservationsTable();
+        $this->applyRaceObservationMigrations();
+        $this->createRaceSetupsTable();
+        $this->createRaceDetailTables();
+        $this->applyRaceDetailMigrations();
 
 
         $this->seedTrainings();
@@ -104,10 +108,216 @@ class DatabaseSeeder
                 pit_count         INTEGER,
                 source            TEXT NOT NULL DEFAULT 'api',
                 calibrated        INTEGER NOT NULL DEFAULT 0,
+                raw_payload       TEXT,
                 imported_at       TEXT NOT NULL DEFAULT (datetime('now')),
                 UNIQUE(track_name, season, race_number, source)
             )
         ");
+    }
+
+    /**
+     * Adds columns to race_observations that were introduced after its
+     * initial CREATE TABLE — needed so a warm database (which skips the
+     * CREATE TABLE IF NOT EXISTS above) still picks them up.
+     */
+    private function applyRaceObservationMigrations(): void
+    {
+        $stmt = $this->db->query('PRAGMA table_info(race_observations)');
+        $cols = $stmt === false ? [] : $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $existingCols = array_column($cols, 'name');
+
+        if (!in_array('raw_payload', $existingCols, true)) {
+            $this->db->exec('ALTER TABLE race_observations ADD COLUMN raw_payload TEXT');
+        }
+
+        // Post-race driver stat deltas (RaceAnalysis's `driverChanges`) and a
+        // per-race earnings summary (`total` / `currentBalance`).
+        $driverChangeCols = [
+            'oa_change', 'con_change', 'tal_change', 'agr_change', 'exp_change',
+            'tei_change', 'sta_change', 'cha_change', 'mot_change', 'rep_change', 'wei_change',
+        ];
+        foreach ($driverChangeCols as $col) {
+            if (!in_array($col, $existingCols, true)) {
+                $this->db->exec("ALTER TABLE race_observations ADD COLUMN {$col} REAL");
+            }
+        }
+        if (!in_array('earnings_total', $existingCols, true)) {
+            $this->db->exec('ALTER TABLE race_observations ADD COLUMN earnings_total REAL');
+        }
+        if (!in_array('balance_after', $existingCols, true)) {
+            $this->db->exec('ALTER TABLE race_observations ADD COLUMN balance_after REAL');
+        }
+
+        // Qualifying, risk profile, driver energy, car stats, overtaking
+        // counts, and technical problems — everything RaceAnalysis reports
+        // beyond the race itself.
+        $textCols = [
+            'q1_time', 'q2_time', 'q1_risk', 'q2_risk', 'start_risk', 'overtake_risk',
+            'defend_risk', 'clear_dry_risk', 'clear_wet_risk', 'problem_risk', 'technical_problems',
+        ];
+        foreach ($textCols as $col) {
+            if (!in_array($col, $existingCols, true)) {
+                $this->db->exec("ALTER TABLE race_observations ADD COLUMN {$col} TEXT");
+            }
+        }
+        $intCols = ['q1_pos', 'q2_pos', 'ot_attempts', 'overtakes', 'ot_attempts_on_you', 'overtakes_on_you'];
+        foreach ($intCols as $col) {
+            if (!in_array($col, $existingCols, true)) {
+                $this->db->exec("ALTER TABLE race_observations ADD COLUMN {$col} INTEGER");
+            }
+        }
+        $realCols = [
+            'q1_energy_from', 'q1_energy_to', 'q2_energy_from', 'q2_energy_to',
+            'race_energy_from', 'race_energy_to', 'car_power', 'car_handl', 'car_accel',
+        ];
+        foreach ($realCols as $col) {
+            if (!in_array($col, $existingCols, true)) {
+                $this->db->exec("ALTER TABLE race_observations ADD COLUMN {$col} REAL");
+            }
+        }
+    }
+
+    /**
+     * Real setup dial values (0-999) the manager actually entered for each
+     * session of a race, as reported by RaceAnalysis's `setupsUsed`. This is
+     * ground truth GPRO's own simulation consumed — unlike our own setup
+     * recommendation, it can be joined to that race's wear/outcome data to
+     * eventually calibrate the setup formula.
+     */
+    private function createRaceSetupsTable(): void
+    {
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS race_setups (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                season       INTEGER NOT NULL,
+                race_number  INTEGER NOT NULL,
+                session      TEXT    NOT NULL CHECK(session IN ('Q1','Q2','Race')),
+                set_fwing    INTEGER,
+                set_rwing    INTEGER,
+                set_eng      INTEGER,
+                set_bra      INTEGER,
+                set_gear     INTEGER,
+                set_susp     INTEGER,
+                set_tyres    TEXT,
+                source       TEXT NOT NULL DEFAULT 'api',
+                imported_at  TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(season, race_number, session, source)
+            )
+        ");
+    }
+
+    /**
+     * Full per-race detail beyond the race_observations summary row: the
+     * lap-by-lap timeline (standings, tyre/fuel state, weather), pit stop
+     * detail, every car part's level/wear, and the financial breakdown.
+     * Nothing here is derived — every value is a direct field from
+     * RaceAnalysis, kept as its own row so it stays queryable rather than
+     * only living inside the raw_payload blob.
+     */
+    private function createRaceDetailTables(): void
+    {
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS race_laps (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                season        INTEGER NOT NULL,
+                race_number   INTEGER NOT NULL,
+                lap_idx       INTEGER NOT NULL,
+                position      INTEGER,
+                tyre_compound TEXT,
+                tyre_cond     REAL,
+                fuel_load     REAL,
+                weather       TEXT,
+                temp          REAL,
+                hum           REAL,
+                lap_time      TEXT,
+                boost_lap     INTEGER,
+                events        TEXT,
+                source        TEXT NOT NULL DEFAULT 'api',
+                UNIQUE(season, race_number, lap_idx, source)
+            )
+        ");
+
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS race_pits (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                season       INTEGER NOT NULL,
+                race_number  INTEGER NOT NULL,
+                pit_idx      INTEGER NOT NULL,
+                lap          INTEGER,
+                reason       TEXT,
+                tyre_cond    REAL,
+                fuel_left    REAL,
+                refilled_to  REAL,
+                pit_time     TEXT,
+                source       TEXT NOT NULL DEFAULT 'api',
+                UNIQUE(season, race_number, pit_idx, source)
+            )
+        ");
+
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS race_car_parts (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                season       INTEGER NOT NULL,
+                race_number  INTEGER NOT NULL,
+                part         TEXT    NOT NULL,
+                lvl          REAL,
+                start_wear   REAL,
+                finish_wear  REAL,
+                source       TEXT NOT NULL DEFAULT 'api',
+                UNIQUE(season, race_number, part, source)
+            )
+        ");
+
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS race_transactions (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                season       INTEGER NOT NULL,
+                race_number  INTEGER NOT NULL,
+                description  TEXT,
+                amount       REAL,
+                source       TEXT NOT NULL DEFAULT 'api'
+            )
+        ");
+
+        // Practice-session laps: per-lap times plus the setup dial values in
+        // effect and the driver's textual feedback for that lap, exactly as
+        // RaceAnalysis's `practiceLaps` reports them.
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS race_practice_laps (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                season            INTEGER NOT NULL,
+                race_number       INTEGER NOT NULL,
+                lap_idx           INTEGER NOT NULL,
+                lap_time          TEXT,
+                net_time          TEXT,
+                mistake_time      TEXT,
+                set_fwing         INTEGER,
+                set_rwing         INTEGER,
+                set_engine        INTEGER,
+                set_brakes        INTEGER,
+                set_gear          INTEGER,
+                set_susp          INTEGER,
+                set_tyres         TEXT,
+                driver_comments   TEXT,
+                source            TEXT NOT NULL DEFAULT 'api',
+                UNIQUE(season, race_number, lap_idx, source)
+            )
+        ");
+    }
+
+    /**
+     * Adds columns to race_laps that were introduced after its initial
+     * CREATE TABLE — needed so a warm database still picks them up.
+     */
+    private function applyRaceDetailMigrations(): void
+    {
+        $stmt = $this->db->query('PRAGMA table_info(race_laps)');
+        $cols = $stmt === false ? [] : $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $existingCols = array_column($cols, 'name');
+
+        if (!in_array('events', $existingCols, true)) {
+            $this->db->exec('ALTER TABLE race_laps ADD COLUMN events TEXT');
+        }
     }
 
     /**

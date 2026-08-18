@@ -26,6 +26,7 @@ use App\Service\TrainingAdvisorService;
 use App\Controller\CarWearController;
 use App\Controller\StrategyController;
 use App\Controller\TestingController;
+use App\Controller\RaceHistoryController;
 use Twig\Environment;
 
 class PageController
@@ -61,6 +62,7 @@ class PageController
         private readonly StrategyController $strategyController,
         private readonly CarWearController $carWearController,
         private readonly TestingController $testingController,
+        private readonly RaceHistoryController $raceHistoryController,
         private readonly GproDataMapper $mapper,
         private readonly RecruitmentService $recruitmentService,
         private readonly Environment $twig,
@@ -507,6 +509,10 @@ class PageController
                 } else {
                     $viewData['testing_results'] = $result;
                 }
+                break;
+
+            case 'Race History':
+                $viewData = array_merge($viewData, $this->raceHistoryController->buildViewData($request));
                 break;
         }
 
