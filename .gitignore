@@ -38,5 +38,3 @@ WORKFLOW.md
 # Tailwind standalone CLI — downloaded on demand by bin/build_tailwind.sh.
 # The compiled CSS in public/assets/ IS committed.
 /bin/.tailwindcss
-
-
