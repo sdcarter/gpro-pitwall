@@ -172,33 +172,49 @@ final class GproApiClient
     }
 
     /**
-     * Most recent race analysis for the authenticated manager. Called with no
-     * SR query parameter so GPRO returns the latest available race — the spec
-     * warns that omitting it can be slow for long-tenured supporters, but the
-     * alternative (walking racesToSelect) costs one call per race.
+     * RaceAnalysis serves two callers in this fork:
+     * - telemetry wants the latest race for the authenticated manager
+     * - the personal history importer wants one specific season/race pair
      *
-     * Keyed to the race window so a new weekend rolls the entry; a manager who
-     * never races again simply keeps serving the same cached payload, and the
-     * telemetry ingest de-duplicates it away.
+     * Both call shapes are supported here because PHP cannot overload methods:
+     *   getRaceAnalysis(bool $forceRefresh = false)
+     *   getRaceAnalysis(int $season, int $race, bool $forceRefresh = false)
      *
      * @return array<string, mixed>
      */
-    public function getRaceAnalysis(bool $forceRefresh = false): array
+    public function getRaceAnalysis(int|bool $seasonOrForceRefresh = false, ?int $race = null, bool $forceRefresh = false): array
     {
-        try {
-            return $this->getCached(
-                'race_analysis',
-                '/gb/backend/api/v2/RaceAnalysis',
-                $this->ttlShort(),
-                $forceRefresh,
-                epoch: $this->raceWindow(),
-            );
-        } catch (\Throwable) {
-            // A manager who is not a supporter, or has not raced, gets an
-            // error or an NA payload here. Telemetry is strictly best-effort:
-            // never let it break a sync.
-            return [];
+        if (is_bool($seasonOrForceRefresh)) {
+            if ($race !== null) {
+                throw new \InvalidArgumentException('Race number cannot be provided without a season');
+            }
+
+            try {
+                return $this->getCached(
+                    'race_analysis',
+                    '/gb/backend/api/v2/RaceAnalysis',
+                    $this->ttlShort(),
+                    $seasonOrForceRefresh,
+                    epoch: $this->raceWindow(),
+                );
+            } catch (\Throwable) {
+                // A manager who is not a supporter, or has not raced, gets an
+                // error or an NA payload here. Telemetry is strictly best-effort:
+                // never let it break a sync.
+                return [];
+            }
         }
+
+        if ($race === null) {
+            throw new \InvalidArgumentException('RaceAnalysis for a specific race requires both season and race');
+        }
+
+        return $this->getCached(
+            "race_analysis_{$seasonOrForceRefresh}_{$race}",
+            "/gb/backend/api/v2/RaceAnalysis?SR={$seasonOrForceRefresh},{$race}",
+            604800, // 7 days
+            $forceRefresh,
+        );
     }
 
     /** @return array<string, mixed> */
@@ -324,23 +340,6 @@ final class GproApiClient
     }
 
     /**
-     * Per-manager race analysis for a completed race.
-     * Uses a long TTL — results are immutable once GPRO posts them.
-     * Does not burn the normal 99-call daily budget (separate pool).
-     *
-     * @return array<string, mixed>
-     */
-    public function getRaceAnalysis(int $season, int $race, bool $forceRefresh = false): array
-    {
-        return $this->getCached(
-            "race_analysis_{$season}_{$race}",
-            "/gb/backend/api/v2/RaceAnalysis?SR={$season},{$race}",
-            604800, // 7 days
-            $forceRefresh,
-        );
-    }
-
-    /**
      * Most recently completed race analysis (no SR param — GPRO resolves it).
      * Cached for 1 hour so completed races are detected within one page load cycle.
      *
@@ -348,12 +347,7 @@ final class GproApiClient
      */
     public function getLatestRaceAnalysis(bool $forceRefresh = false): array
     {
-        return $this->getCached(
-            'race_analysis_latest',
-            '/gb/backend/api/v2/RaceAnalysis',
-            3600,
-            $forceRefresh,
-        );
+        return $this->getRaceAnalysis($forceRefresh);
     }
 
     /** @return array<string, mixed> */
