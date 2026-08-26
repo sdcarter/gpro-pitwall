@@ -46,6 +46,10 @@ tasks:
     desc: Report dry-race calibration status and fit candidate fuel coefficients when ready
     cmd: "{{.APP}} php bin/fit_fuel_coefficients.php"
 
+  export-races:
+    desc: "Export race reports as Markdown for NotebookLM grounding. Usage: task export-races (all) or task export-races -- --season=112 or task export-races -- --season=112 --race=1"
+    cmd: "{{.APP}} php bin/export_race_reports.php {{.CLI_ARGS}}"
+
   audit-race-data:
     desc: Report missing normalized RaceAnalysis sections and implausible fuel values without changing data
     cmd: "{{.APP}} php bin/audit_race_data.php"
