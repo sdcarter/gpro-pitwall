@@ -40,6 +40,8 @@ One screen in race-prep order. A **decision summary board** leads: one verdict t
 
 Fuel, tyres and setup for every compound (Extra Soft / Soft / Medium / Hard / Rain), auto-run on first visit, re-run live by a risk slider. The **verdict leads**: best compound, stops, fuel per stint, total time lost and the margin over the runner-up — always compared within the same tyre type (a dry race compares dry compounds only; a wet race recommends Rain outright — it's the only wet compound). Below it: a per-compound breakdown of time lost (pits / fuel / compound difference), the Q1 / Q2 / race setup table with weather-aware tyre choices, and your contracted tyre supplier's dry/wet rating and ideal temperature beside the track name.
 
+Clear Track Risk is shown as a trade, not just a cost. Raising it wears the tyres faster (which can force a harder compound or an extra stop) while buying back clear-air lap time; a **CTR Gain** column prices that gain and the table's final column reports **Net** — time lost minus time gained — so both halves land in the same comparison as you drag the slider. The gain scales with the track's lap time, so a slow lap is worth more per point of risk than a fast lap of the same length. The gain is clear-air only, and the table says so: a driver stuck in traffic pays the wear without banking the time.
+
 The stop count is chosen by cost, not by tyre life alone: every stop count the tyres allow is priced (pit losses against the fuel-weight saving of a lighter car and the compound difference) and the cheapest wins, so an extra stop is recommended whenever it actually saves time. Plans are filtered for feasibility first — the *recommended* load, boost fuel and safety lap included, must fit the 180 L tank, so a strategy you couldn't physically fuel is never offered.
 
 Wet consumption is measured per track rather than derived — GPRO publishes no wet-fuel rule. A handful of tracks have never run a wet race and so have no sample at all; there the wet figures fall back to the dry rate and are labelled **est.** with a caution banner, so the number over-fuels you rather than stranding the car.
@@ -82,6 +84,7 @@ Scores the full GPRO driver market (4–5k drivers) against your division's idea
 - **Division baseline / differences** — per-division ideal-pilot tables with OA caps (Rookie 85 / Amateur 110 / Pro 135 / Master 160 / Elite ∞), plus pairwise division insights.
 - **User management** — paginated, sortable user list with growth trends over a selectable 7/30/90-day window; admin-flag toggle with self-demotion guard, soft-delete/restore, and every mutation in an append-only audit log.
 - **Account support tools** — rename a user whose username predates the current whitelist, plus a per-user email delivery check. Login matches the username byte-for-byte and case-sensitively, so an account created with an accent or a space becomes unreachable to anyone who misremembers its exact spelling — renaming to a conforming name is the supported repair. Both actions confirm first and are audited.
+- **Race Intelligence** (`/admin/telemetry`) — a collective, **anonymous** race corpus built from the `RaceAnalysis` data managers already sync, with no extra per-page API cost. Segmented by GPRO level (Rookie → Elite) throughout: driver-attribute correlations against finishing position, the podium "driver prototype" against the rest of the field, tyre performance split by wet/dry, Technical Director with/without comparison, qualifying and race risk settings, pit strategy, and driver-mistake impact. Slices thinner than a minimum sample are withheld rather than shown as findings. Rows carry **no user identifier of any kind** — see *Security posture*.
 - **Telemetry** (`/debug`) — registered vs active users (successful sync in the last 30 days), tokens set, API budget, runtime info, masked environment.
 
 ### Accounts
@@ -184,7 +187,7 @@ Source of truth is GitHub; deployment is a manual file copy to any PHP 8.5 host.
 - **Twig 3** templates; **Tailwind v4** compiled to a static asset (no CDN, no in-browser compile). Light and dark themes ship in one stylesheet: every design token is a CSS `light-dark()` pair switched by `color-scheme`, so System mode tracks the OS with zero JavaScript.
 - **SQLite** via PDO — emails and API tokens encrypted at rest (AES-256-GCM).
 - **PHPMailer 7** for SMTP; dev writes `.eml` files instead.
-- **PHPUnit 13** — 399 tests, 1069 assertions — with **PHPStan level 8** and enforced type-declaration coverage (100% return/property/constant + `strict_types`; 99.5% param). Twig linted by a native `bin/twig_lint.php` built on Twig's own parser. CI measures statement coverage with `pcov` and enforces a floor (currently 45%, ratcheted up as coverage grows).
+- **PHPUnit 13** — 454 tests, 1393 assertions — with **PHPStan level 8** and enforced type-declaration coverage (100% return/property/constant + `strict_types`; 99.5% param). Twig linted by a native `bin/twig_lint.php` built on Twig's own parser. CI measures statement coverage with `pcov` and enforces a floor (currently 45%, ratcheted up as coverage grows).
 - **Timestamps stored and served as UTC**, localised per visitor in the browser — no server-side timezone config.
 
 ## Architecture
@@ -195,7 +198,7 @@ Request → public/index.php → Http\Router → Controller → Service → Repo
 
 - Controllers are thin; logic lives in services; repositories own the SQL (prepared statements only).
 - `bootstrap.php` wires every dependency into a flat container — adding a service is one line.
-- Cache adapters (`filesystem` default, APCu, Redis, none) behind one interface, resolved by `CacheFactory`.
+- Cache adapters (`filesystem` default, APCu, Redis, none) behind one interface, resolved by `CacheFactory`. Every key is namespaced by app version, so a deploy can never serve a previous release's payload shape out of a cache segment it cannot wipe.
 - **Host-wide outbound throttle** — all GPRO API calls leave from one IP, so a token bucket shared across PHP workers (a `flock`'d state file) paces real fetches under burst load; cache hits never touch it. It never throws — worst case is "slightly slower", not a failed page. Complements the per-token budget guard (`SYNC_SAFETY_MARGIN`).
 - **Race-window cache keys** — race-critical data is namespaced by the current race window (computed from the clock against GPRO's Tue/Fri schedule, no API call), so caches roll over exactly once per race weekend instead of serving last week's data until TTL. Configurable via `GPRO_RACE_DAYS` / `GPRO_RACE_BOUNDARY_HOUR` / `GPRO_RACE_TZ`.
 
@@ -210,6 +213,7 @@ Reviewed against the OWASP Top 10:2025.
 - Security headers in `public/.htaccess`: Content-Security-Policy, HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy — proxy-aware via `X-Forwarded-Proto`.
 - Session cookies HttpOnly + Secure + SameSite=Lax. "Remember me" tokens store only a hashed validator, rotate on every use for theft detection, and are revocable. Dynamic responses send `Cache-Control: no-store`, so authenticated pages aren't retained in the browser cache after logout on a shared machine.
 - Login and registration are reCAPTCHA-gated and rate-limited per IP; verification codes carry a TTL, an attempt cap, and a per-account hourly email cap, so blind username-guessing can't spam real users. Sensitive actions require step-up re-authentication.
+- Race telemetry is **anonymous at the data model**: the `race_telemetry` table carries no user id, username, or account-derived key, and de-duplicates on the race's own natural key rather than a per-user token — so an admin (or anyone with the DB file and `APP_SECRET`) cannot attribute a row to the manager who produced it. The admin intelligence screen reads only whole-dataset aggregates.
 - One centralised authorisation gate (`requireAuth` / `requireAdmin` / `requireFreshAuth`) — every mutating, admin and debug route is gated server-side, not just hidden in templates.
 - The contact form is authenticated-only with a whitelisted subject list (no user text ever reaches an email header) and a security-logged per-user rate limit — layered controls that make a CAPTCHA unnecessary there.
 - Structured `[security]` event logging for failed logins, rate-limit hits and token-theft detection; admin mutations recorded in an append-only `audit_log`.

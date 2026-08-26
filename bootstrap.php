@@ -60,6 +60,10 @@ $cacheConfig = [
     'REDIS_HOST'     => Env::get('REDIS_HOST', '127.0.0.1'),
     'REDIS_PORT'     => Env::int('REDIS_PORT', 6379),
     'REDIS_PASSWORD' => Env::get('REDIS_PASSWORD'),
+    // Cache keys are namespaced by app version so a release never reads a
+    // previous release's payload shape out of a segment it cannot wipe (APCu,
+    // Redis). Override to force an early rotation without a version bump.
+    'CACHE_NAMESPACE' => Env::get('CACHE_NAMESPACE', $container['version']),
 ];
 
 $container['service.cache'] = CacheFactory::create($cacheConfig);
@@ -222,10 +226,19 @@ $container['service.api_client'] = new GproApiClient(
     $container['service.api_fetcher'],
     $container['service.cache']
 );
+$container['repo.race_telemetry'] = new \App\Repository\RaceTelemetryRepository($container['db']);
+$container['service.race_telemetry'] = new \App\Service\RaceTelemetryService(
+    $container['repo.race_telemetry'],
+    new \App\Telemetry\RaceTelemetryMapper(),
+);
+$container['service.race_intelligence'] = new \App\Service\RaceIntelligenceService(
+    $container['repo.race_telemetry'],
+);
 $container['service.gpro_sync'] = new GproSyncService(
     $container['service.api_client'],
     $container['service.user_repo'],
     $container['service.cache'],
+    $container['service.race_telemetry'],
     Env::int('SYNC_SAFETY_MARGIN', 20),
 );
 $container['service.race_import'] = new \App\Service\RaceImportService(
@@ -463,6 +476,12 @@ $container['service.admin_users'] = new \App\Service\AdminUserService(
 
 $container['controller.admin_users'] = new \App\Controller\AdminUserController(
     $container['service.admin_users'],
+    $container['service.authorize'],
+    $container['twig'],
+);
+
+$container['controller.admin_telemetry'] = new \App\Controller\AdminTelemetryController(
+    $container['service.race_intelligence'],
     $container['service.authorize'],
     $container['twig'],
 );
